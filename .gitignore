@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+*.env.local
+config/settings.yaml  # 不提交敏感配置
+
+# Data
+data/analytics/*.json
+data/content/*.json
+data/leads/*.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+pipeline.log
+
+# Git
+*.orig

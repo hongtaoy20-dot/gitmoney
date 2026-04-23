@@ -1,0 +1,110 @@
+# GitMoney 配置
+# 请复制此文件为 settings.yaml 后填写
+
+# === GitHub ===
+github:
+  token: "${GITHUB_TOKEN}"          # GitHub Personal Access Token
+  username: "jackyZhangtt"           # GitHub 用户名
+  primary_repo: "gitmoney"           # 主仓库名
+  sponsor_repo: ""                   # 赞助页仓库 (可选)
+
+# === Agent 1: Content Creator ===
+creator:
+  content_types:                     # 支持的内容类型
+    - article                        # 技术文章
+    - code_template                  # 代码模板
+    - gist                           # Gist
+    - issue_response                 # Issue 回复
+    - pr                             # Pull Request
+    - readme                         # README 优化
+  
+  topics:                            # 创作主题池
+    - "python automation"
+    - "maritime technology"
+    - "value investing"
+    - "AI agents"
+    - "system design"
+    - "immigration guide"
+    - "marine engineering"
+    - "financial independence"
+  
+  output_frequency:                  # 输出频率
+    articles_per_week: 3
+    code_templates_per_week: 2
+    responses_per_day: 2
+  
+  quality_settings:
+    min_word_count: 800              # 最小字数
+    seo_score_threshold: 70          # SEO 评分阈值
+    ai_detection_max: 30             # AI 检测概率上限 (%)
+
+# === Agent 2: Traffic Driver ===
+traffic:
+  platforms:                         # 推广平台
+    twitter: 
+      enabled: true
+      api_key: ""
+      api_secret: ""
+    linkedin:
+      enabled: true
+      api_key: ""
+    reddit:
+      enabled: true
+      client_id: ""
+      client_secret: ""
+    hackernews:
+      enabled: true
+  
+  seo:
+    keyword_research: true           # 关键词研究
+    backlink_strategy: true          # 外链策略
+    meta_optimization: true          # Meta 标签优化
+  
+  github_marketing:
+    issue_participation: true        # Issue 参与
+    pr_collaboration: true           # PR 协作
+    star_for_star: false             # ❌ 互刷星 (违规)
+    trending_analysis: true          # Trending 分析
+
+# === Agent 3: Monetizer ===
+monetizer:
+  channels:
+    github_sponsors:                 # GitHub Sponsors
+      enabled: true
+      target_tier_monthly: 50        # 目标月赞助额 ($)
+    
+    paid_content:                    # 付费内容
+      enabled: true
+      platforms:
+        - "gumroad"                  # 卖模板/电子书
+        - "leanpub"                  # 技术书籍
+      pricing:
+        template: 5                  # 代码模板 ($)
+        ebook: 15                    # 电子书 ($)
+        course: 49                   # 课程 ($)
+    
+    consulting:                      # 咨询引流
+      enabled: true
+      rate_per_hour: 100             # 咨询费率 ($)
+      niche: "maritime IT & automation"
+    
+    affiliate:                       # 联盟营销
+      enabled: true
+      networks:
+        - "amazon"
+        - "digitalocean"
+        - "vultr"
+  
+  analytics:
+    track_conversion: true           # 转化追踪
+    track_views: true                # 浏览量追踪
+    a_b_test_enabled: true           # A/B 测试
+
+# === Orchestrator ===
+orchestrator:
+  schedule:
+    daily_time: "08:00"              # 每日执行时间 (UTC)
+    weekly_review: "Sunday 20:00"    # 每周复盘
+  mode: "semi_auto"                  # auto / semi_auto / manual
+  alert_level: "info"                # debug / info / warn / error
+  log_dir: "data/analytics/"         # 日志目录

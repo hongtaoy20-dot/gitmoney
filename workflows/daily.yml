@@ -1,0 +1,62 @@
+name: GitMoney Daily Pipeline
+
+on:
+  schedule:
+    # UTC 00:00 = 北京时间 08:00
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Pipeline mode'
+        required: true
+        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - full
+          - analytics
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pyyaml
+
+      - name: Run Orchestrator
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+        run: |
+          MODE="${{ github.event.inputs.mode || 'daily' }}"
+          python orchestrator.py --mode "$MODE"
+
+      - name: Commit and Push Results
+        run: |
+          git config --local user.email "gitmoney-bot@users.noreply.github.com"
+          git config --local user.name "GitMoney Bot"
+          git add data/analytics/ data/content/ data/leads/
+          git diff --cached --quiet || git commit -m "chore: auto-run pipeline results [skip ci]"
+          git push origin main
+        continue-on-error: true
+
+      - name: Save Execution Log
+        run: |
+          echo "Pipeline completed at $(date -u)" >> pipeline.log
+          echo "Mode: ${{ github.event.inputs.mode || 'daily' }}" >> pipeline.log
+          cat pipeline.log
