@@ -53,8 +53,12 @@ class LinkedInPromoter:
     ]
 
     def __init__(self):
-        self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        self.api_key = os.environ.get("OPENROUTER_API_KEY", "") or \
+                       os.environ.get("DEEPSEEK_API_KEY", "")
+        self.api_base = "https://openrouter.ai/api/v1/chat/completions" if os.environ.get("OPENROUTER_API_KEY") else \
+                       "https://api.deepseek.com/v1/chat/completions" if os.environ.get("DEEPSEEK_API_KEY") else ""
         self.llm_available = bool(self.api_key)
+        self.model = "deepseek/deepseek-chat" if os.environ.get("OPENROUTER_API_KEY") else "deepseek-chat"
 
     def generate_linkedin_post(self, theme_index: int = None, topic_title: str = "") -> dict:
         """生成一篇 LinkedIn 帖子 (免费长文/短帖)"""
@@ -101,13 +105,13 @@ CTA类型: {cta} (consulting → 咨询服务, audit → 审核服务, content �
                 "Content-Type": "application/json",
             }
             data = {
-                "model": "deepseek/deepseek-chat",
+                "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.8,
                 "max_tokens": 800,
             }
             resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                self.api_base,
                 headers=headers, json=data, timeout=60
             )
             if resp.status_code == 200:
@@ -165,8 +169,12 @@ class MaritimeSocialPromoter:
     TECH_SUBREDDITS = ["r/Python", "r/opensource", "r/coolgithubprojects", "r/automation"]
 
     def __init__(self):
-        self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        self.api_key = os.environ.get("OPENROUTER_API_KEY", "") or \
+                       os.environ.get("DEEPSEEK_API_KEY", "")
+        self.api_base = "https://openrouter.ai/api/v1/chat/completions" if os.environ.get("OPENROUTER_API_KEY") else \
+                       "https://api.deepseek.com/v1/chat/completions" if os.environ.get("DEEPSEEK_API_KEY") else ""
         self.llm_available = bool(self.api_key)
+        self.model = "deepseek/deepseek-chat" if os.environ.get("OPENROUTER_API_KEY") else "deepseek-chat"
 
     def find_best_subreddits(self, channel: str) -> list:
         """根据变现管道推荐发帖社区"""
@@ -209,18 +217,31 @@ BODY: (帖子正文)
                 "Content-Type": "application/json",
             }
             data = {
-                "model": "deepseek/deepseek-chat",
+                "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.7,
                 "max_tokens": 800,
             }
             resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                self.api_base,
                 headers=headers, json=data, timeout=60
             )
             if resp.status_code == 200:
                 content = resp.json()["choices"][0]["message"]["content"]
-                return {"subreddit": subreddit, "content": content, "generated_by": "llm"}
+                # Parse TITLE/BODY format
+                title_line = ""
+                body = content
+                for line in content.split("\n"):
+                    if line.startswith("TITLE:"):
+                        title_line = line.replace("TITLE:", "").strip()
+                    elif line.startswith("BODY:"):
+                        body = line.replace("BODY:", "").strip()
+                return {
+                    "subreddit": subreddit,
+                    "content": body,
+                    "title": title_line,
+                    "generated_by": "llm",
+                }
         except Exception:
             pass
         return self._reddit_template(title, subreddit)

@@ -2,7 +2,18 @@
 """Test all 3 agents and full pipeline"""
 import os, sys, subprocess, json, re
 
-# Read token
+# Read tokens from Hermes config
+import yaml
+config_path = os.path.expanduser("~/.hermes/config.yaml")
+with open(config_path) as f:
+    config = yaml.safe_load(f)
+
+deepseek_key = config.get("model", {}).get("api_key", "")
+if deepseek_key:
+    os.environ["DEEPSEEK_API_KEY"] = deepseek_key
+    print("  DEEPSEEK_API_KEY loaded from config")
+
+# Also read github-sync.env for GitHub token
 env_path = os.path.expanduser("~/.hermes/config/github-sync.env")
 with open(env_path) as f:
     m = re.search(r'GITHUB_TOKEN=([^\s";\r\n]+)', f.read())
