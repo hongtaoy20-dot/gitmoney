@@ -1,0 +1,67 @@
+name: GitMoney Weekly Review
+
+on:
+  schedule:
+    # 每周日 UTC 12:00 = 北京时间 20:00
+    - cron: '0 12 * * 0'
+  workflow_dispatch:
+
+jobs:
+  weekly-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate Weekly Report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python orchestrator.py --mode analytics
+
+      - name: Generate GitHub Pages Report
+        run: |
+          mkdir -p docs
+          # 生成周报 HTML
+          cat > docs/weekly-report.html << 'EOF'
+          <!DOCTYPE html>
+          <html><head>
+            <meta charset="utf-8">
+            <title>GitMoney Weekly Report</title>
+            <style>
+              body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:800px;margin:0 auto;padding:20px}
+              h1{color:#2ea44f}
+              .metric{border:1px solid #ddd;padding:15px;margin:10px 0;border-radius:6px}
+              .metric h3{margin:0 0 10px}
+              .value{font-size:24px;font-weight:bold;color:#0366d6}
+            </style>
+          </head><body>
+            <h1>GitMoney Weekly Report</h1>
+            <p>Generated: $(date -u)</p>
+            <div class="metric">
+              <h3>Pipeline Status</h3>
+              <p>Last 7 days of automated execution</p>
+            </div>
+            <div class="metric">
+              <h3>Revenue Estimate</h3>
+              <p class="value">Calculating...</p>
+            </div>
+            <div class="metric">
+              <h3>Repository Stats</h3>
+              <p>Stars, forks, and traffic data</p>
+            </div>
+          </body></html>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
+        continue-on-error: true
