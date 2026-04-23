@@ -1,25 +1,18 @@
 #!/usr/bin/env python3
 """
-GitMoney Agent 2: Traffic Driver
-=================================
-自动完成推广引流: SEO 优化、社交媒体推广、GitHub 生态参与。
+GitMoney Agent 2: Traffic Driver (V2 - Captain Edition)
+=========================================================
+自动化推广引流 — 专精5条变现管道的流量获取:
 
-功能:
-  - SEO 优化 (README/Issue meta 分析 + 关键词注入)
-  - 社交媒体自动推广 (Twitter/X, LinkedIn, Reddit, Hacker News)
-  - GitHub 生态参与 (相关 Issue 回复、PR 协作)
-  - Trending 仓库监控与分析
-  - 外链建设
+渠道建设:
+1. LinkedIn → 邮轮运营/海事合规内容 → B2B咨询线索
+2. GitHub → 开源工具/技术内容 → Star+Issue互动 → 变现漏斗
+3. Reddit (r/maritime, r/investing) → 精准社区引流
+4. Hacker News → 技术文章曝光 → 开源项目关注
+5. 跨管道协同 → 内容一篇多发 + 互相导流
 """
 
-import os
-import sys
-import json
-import yaml
-import time
-import random
-import re
-import requests
+import os, sys, json, yaml, time, random, re, requests
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -34,7 +27,6 @@ LEADS_DIR.mkdir(parents=True, exist_ok=True)
 with open(CONFIG_PATH) as f:
     CONFIG = yaml.safe_load(f)
 
-# 支持 ${ENV_VAR} 模板语法和直接值
 _raw_token = CONFIG.get("github", {}).get("token", "")
 if _raw_token.startswith("${") and _raw_token.endswith("}"):
     _env_var = _raw_token[2:-1]
@@ -44,384 +36,434 @@ else:
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "") or GITHUB_TOKEN
 GITHUB_USER = CONFIG.get("github", {}).get("username", "")
 
+# ─── LinkedIn 推广器 ────────────────────────────────────────────────────
+class LinkedInPromoter:
+    """LinkedIn 推广 — 核心 B2B 引流渠道"""
 
-# ─── SEO 优化器 ────────────────────────────────────────────────────────
+    # 你的固定身份信息 — 用于生成 LinkedIn 内容
+    PROFILE_BIO = "Chief Officer at Viking Cruises | Master Mariner | ISM/ISPS/MLC Auditor | US Value Investor"
 
-class SEOOptimizer:
-    """README/内容 SEO 分析与优化"""
-    
+    CONTENT_THEMES = [
+        # (theme, target_industry, cta_type)
+        ("Day-to-day cruise operations insights", "cruise lines / fleet management", "consulting"),
+        ("Maritime safety & compliance stories", "ship management companies", "audit"),
+        ("Career growth at sea", "junior officers / maritime students", "content"),
+        ("Value investing for maritime professionals", "maritime professionals", "stock"),
+        ("Automation tools for ship ops", "tech-forward shipping companies", "tools"),
+    ]
+
     def __init__(self):
-        self.api_base = "https://openrouter.ai/api/v1/chat/completions"
         self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
-    
-    def analyze_readme_seo(self, readme_content: str) -> dict:
-        """分析 README 的 SEO 评分"""
-        score = 0
-        issues = []
-        suggestions = []
-        
-        # 1. H1 标题检查
-        if re.search(r'^#\s+\S+', readme_content, re.MULTILINE):
-            score += 15
-        else:
-            issues.append("缺少 H1 标题")
-            suggestions.append("添加一个包含主要关键词的 H1 标题")
-        
-        # 2. 字数检查
-        word_count = len(readme_content)
-        if word_count > 300:
-            score += 15
-        elif word_count > 150:
-            score += 8
-        else:
-            issues.append("内容过短 (< 150 字) 不利于 SEO")
-            suggestions.append("将 README 扩展到 300 字以上")
-        
-        # 3. 关键词密度
-        keywords = ["python", "automation", "agent", "github", "tutorial",
-                    "guide", "open source", "api", "deploy", "docker"]
-        keyword_hits = sum(1 for kw in keywords if kw.lower() in readme_content.lower())
-        keyword_score = min(keyword_hits * 5, 20)
-        score += keyword_score
-        
-        # 4. 结构完整性
-        has_code = "```" in readme_content
-        has_list = "- " in readme_content or "* " in readme_content
-        has_link = "http" in readme_content
-        
-        if has_code: score += 10
-        if has_list: score += 10
-        if has_link: score += 10
-        
-        # 5. Badge 检查
-        badge_count = len(re.findall(r'!\[.*?\]\(.*?\)', readme_content))
-        if badge_count >= 3:
-            score += 10
-        elif badge_count >= 1:
-            score += 5
-        
-        # 6. 描述性开头
-        first_para = readme_content.split('\n\n')[0] if '\n\n' in readme_content else readme_content
-        if len(first_para) > 50:
-            score += 10
-        
-        return {
-            "score": min(score, 100),
-            "word_count": word_count,
-            "keyword_hits": keyword_hits,
-            "has_code": has_code,
-            "has_list": has_list,
-            "badge_count": badge_count,
-            "issues": issues,
-            "suggestions": suggestions,
-        }
-    
-    def generate_seo_meta(self, title: str, description: str, keywords: list) -> str:
-        """生成 SEO 优化的 meta 描述"""
-        prompt = f"""生成一段 SEO 优化的 GitHub 仓库描述 (用于 repo description 和 social preview)。
+        self.llm_available = bool(self.api_key)
 
-标题: {title}
-核心关键词: {', '.join(keywords)}
-原始描述: {description}
+    def generate_linkedin_post(self, theme_index: int = None, topic_title: str = "") -> dict:
+        """生成一篇 LinkedIn 帖子 (免费长文/短帖)"""
+        if theme_index is None:
+            theme_index = random.randint(0, len(self.CONTENT_THEMES) - 1)
+
+        theme, industry, cta = self.CONTENT_THEMES[theme_index]
+
+        if self.llm_available:
+            return self._generate_with_llm(theme, industry, cta, topic_title)
+        return self._generate_template(theme, industry, cta)
+
+    def _generate_with_llm(self, theme: str, industry: str, cta: str, topic_title: str) -> dict:
+        """用 LLM 生成 LinkedIn 帖子"""
+        prompt = f"""你是一位有 15 年经验的 Viking Cruises Chief Officer (Master Mariner)。
+请写一篇适合 LinkedIn 发布的专业帖子，主题属于: {theme}
+
+目标行业/读者: {industry}
+CTA类型: {cta} (consulting → 咨询服务, audit → 审核服务, content → 引流, stock → 投资指导, tools → 工具)
+
+参考身份信息:
+- Chief Officer, Viking Cruises (15年)
+- ISM/ISPS/MLC Auditor
+- US Value Investor (3年经验)
+- 目标: 从中国 Tier 2 城市 → Florida USA
 
 要求:
-- 长度 80-120 字符
-- 自然嵌入 2-3 个关键词
-- 吸引开发者点击
-- 不含营销套话
-- 英文"""
-        
-        return self._call_llm(prompt)
-    
-    def _call_llm(self, prompt: str) -> str:
-        if not self.api_key:
-            return f"{prompt[:60]}... (no API key for full generation)"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-        data = {
-            "model": "deepseek/deepseek-chat",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.5,
-            "max_tokens": 300,
-        }
+- 第一人称，真诚，专业
+- 200-400 字
+- 分享1-2个具体经验/洞察（不要泛泛而谈）
+- 自然结尾 CTA（与 cta_type 匹配）
+- 添加 5 个相关 hashtag（#Maritime #CruiseLife #Leadership 等）
+
+内容风格参考:
+'After 15 years at sea, one lesson stands out above all...'
+'What they don't teach you in maritime academy...'
+'The most underrated skill in cruise operations...'
+
+请直接生成帖子内容。"""
+
         try:
-            resp = requests.post(self.api_base, headers=headers, json=data, timeout=30)
-            if resp.status_code == 200:
-                return resp.json()["choices"][0]["message"]["content"]
-        except Exception:
-            pass
-        return description_from_prompt(prompt)
-
-
-def description_from_prompt(prompt: str) -> str:
-    """降级 - 从 prompt 提取描述"""
-    lines = prompt.split('\n')
-    for l in lines:
-        if l.strip().startswith("- ") and len(l) > 30:
-            return l.strip("- ").strip()
-    return f"A guide about {prompt.split(',')[0]}"
-
-
-# ─── Twitter/X 推广器 ─────────────────────────────────────────────────
-
-class TwitterPromoter:
-    """Twitter/X 自动推广"""
-    
-    def __init__(self):
-        self.api_key = CONFIG.get("traffic", {}).get("platforms", {}).get("twitter", {}).get("api_key", "")
-        self.enabled = CONFIG.get("traffic", {}).get("platforms", {}).get("twitter", {}).get("enabled", False)
-    
-    def post_content(self, title: str, url: str, description: str) -> dict:
-        """发布推文 (需要 Twitter API v2 凭据)"""
-        if not self.enabled or not self.api_key:
-            return {"status": "skipped", "reason": "Twitter API not configured"}
-        
-        # Twitter API v2 发推 (需要 OAuth 2.0 Bearer Token + 用户认证)
-        # 此处简化 - 记录待发布队列
-        tweet_text = f"{title}\n\n{description[:200]}\n\n{url}"
-        
-        # 保存到待发布队列
-        queue_file = DATA_DIR / "tweet_queue.json"
-        queue = []
-        if queue_file.exists():
-            with open(queue_file) as f:
-                queue = json.load(f)
-        
-        queue.append({
-            "text": tweet_text,
-            "created_at": datetime.now(UTC).isoformat(),
-            "status": "pending",
-        })
-        
-        with open(queue_file, "w") as f:
-            json.dump(queue[-50:], f, indent=2)  # 保留最近 50 条
-        
-        return {"status": "queued", "tweet": tweet_text[:80]}
-    
-    def generate_tweet_thread(self, article_content: str) -> list:
-        """从文章生成推文线程 (3-5 条)"""
-        prompt = f"""将以下文章转换为 Twitter/X 线程 (3-5 条推文):
-
-{article_content[:1500]}
-
-要求:
-- 每条 < 280 字符
-- 第1条吸引注意，最后1条引导点击链接
-- 每条之间必须有逻辑衔接
-- 使用适当的话题标签 (最多3个)
-- 风格专业但不枯燥
-
-输出格式: 每条推文用 --- 分隔"""
-        
-        headers = {
-            "Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY', '')}",
-            "Content-Type": "application/json",
-        }
-        data = {
-            "model": "deepseek/deepseek-chat",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.8,
-            "max_tokens": 1000,
-        }
-        
-        try:
-            resp = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                               headers=headers, json=data, timeout=30)
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "model": "deepseek/deepseek-chat",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.8,
+                "max_tokens": 800,
+            }
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=data, timeout=60
+            )
             if resp.status_code == 200:
                 content = resp.json()["choices"][0]["message"]["content"]
-                tweets = [t.strip() for t in content.split("---") if t.strip()]
-                return tweets[:5]
+                return {
+                    "content": content,
+                    "theme": theme,
+                    "industry": industry,
+                    "cta_type": cta,
+                    "hashtags": re.findall(r'#\w+', content),
+                    "generated_by": "llm",
+                }
         except Exception:
             pass
-        
-        return [f"Check out this article: {article_content[:200]}... #dev #opensource"]
+        return self._generate_template(theme, industry, cta)
+
+    def _generate_template(self, theme: str, industry: str, cta: str) -> dict:
+        """降级模板"""
+        return {
+            "content": f"""**{theme}**
+
+After 15 years on the bridge of Viking Cruises, I've learned that {theme.lower()} is one of the most misunderstood aspects of our industry.
+
+Here's what I've found actually works:
+
+1️⃣ Start with the fundamentals — don't overcomplicate it
+2️⃣ Listen to your crew — they know the ship better than anyone
+3️⃣ Document everything — data is your best friend in operations
+
+The maritime industry is transforming rapidly. Those who adapt will thrive.
+
+What's your experience been? Drop a comment below.
+
+#Maritime #CruiseIndustry #Leadership #MarineOperations #VikingCruises""",
+            "theme": theme,
+            "industry": industry,
+            "cta_type": cta,
+            "hashtags": ["#Maritime", "#CruiseIndustry", "#Leadership", "#MarineOperations", "#VikingCruises"],
+            "generated_by": "template",
+        }
+
+    def estimate_reach(self, followers: int = 0) -> int:
+        """估算 LinkedIn 帖子近期可达到的触达量"""
+        # 新账号起步保守估计
+        base = followers or 50
+        return int(base * 1.5 + random.randint(50, 200))
 
 
-# ─── GitHub 生态推广 ─────────────────────────────────────────────────
+# ─── Reddit/HN 精准推广 ───────────────────────────────────────────────
+class MaritimeSocialPromoter:
+    """针对海事/投资社区的精准推广"""
 
-class GitHubPromoter:
-    """GitHub 生态内的推广 (参与 Issue, Trending 分析)"""
-    
+    MARITIME_SUBREDDITS = ["r/maritime", "r/shipping", "r/Nautical", "r/MarineEngineering"]
+    INVESTING_SUBREDDITS = ["r/investing", "r/valueinvesting", "r/stocks", "r/dividends"]
+    TECH_SUBREDDITS = ["r/Python", "r/opensource", "r/coolgithubprojects", "r/automation"]
+
+    def __init__(self):
+        self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        self.llm_available = bool(self.api_key)
+
+    def find_best_subreddits(self, channel: str) -> list:
+        """根据变现管道推荐发帖社区"""
+        channel_map = {
+            "cruise_consulting": self.MARITIME_SUBREDDITS + ["r/logistics"],
+            "maritime_auditor": self.MARITIME_SUBREDDITS,
+            "cruise_content": self.MARITIME_SUBREDDITS + ["r/travel"],
+            "us_stocks": self.INVESTING_SUBREDDITS + ["r/algotrading"],
+            "cruise_tools": self.TECH_SUBREDDITS + self.MARITIME_SUBREDDITS,
+            "general": self.TECH_SUBREDDITS,
+        }
+        return channel_map.get(channel, self.TECH_SUBREDDITS[:2])
+
+    def generate_reddit_post(self, title: str, subreddit: str, channel: str) -> dict:
+        """生成适合特定 subreddit 的红迪帖子"""
+        if not self.llm_available:
+            return self._reddit_template(title, subreddit)
+
+        prompt = f"""请生成一篇 Reddit 帖子，准备提交到 {subreddit}。
+
+内容主题: {title}
+变现管道: {channel}
+作者身份: Viking Cruises Chief Officer, ISM/ISPS/MLC Auditor, Value Investor
+
+要求:
+- 符合 Reddit 社区文化和 {subreddit} 的预期
+- 不要明显的营销推广语气
+- 真诚分享经验或提问引导讨论
+- 适合帖子（不是评论），200-500字
+- 以分享专业视角为核心，而不是推销
+
+请输出格式:
+TITLE: (帖子标题, 吸引眼球)
+BODY: (帖子正文)
+"""
+
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
+            data = {
+                "model": "deepseek/deepseek-chat",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 800,
+            }
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=data, timeout=60
+            )
+            if resp.status_code == 200:
+                content = resp.json()["choices"][0]["message"]["content"]
+                return {"subreddit": subreddit, "content": content, "generated_by": "llm"}
+        except Exception:
+            pass
+        return self._reddit_template(title, subreddit)
+
+    def _reddit_template(self, title: str, subreddit: str) -> dict:
+        return {
+            "subreddit": subreddit,
+            "content": f"TITLE: {title}\nBODY: I've been working in the maritime industry for 15 years and wanted to share some insights about this topic. Happy to answer questions in the comments!",
+            "generated_by": "template",
+        }
+
+
+# ─── Hacker News 推广 ────────────────────────────────────────────────
+class HNPromoter:
+    """Hacker News 推广 — 适合技术类/开源项目"""
+
+    def __init__(self):
+        self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
+
+    def generate_hn_title(self, project_name: str, project_desc: str) -> str:
+        """生成吸引 Hacker News 社区的标题"""
+        if self.api_key:
+            prompt = f"""为以下开源项目生成一个适合 Hacker News 的提交标题。
+
+项目: {project_name}
+描述: {project_desc}
+
+要求:
+- 吸引 HN 社区 (开发者和创业者)
+- 诚实，不 clickbait
+- 突出技术亮点或独特价值
+- 60-80 字符
+- 只是一个标题，不要解释
+
+标题:"""
+            try:
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                }
+                data = {
+                    "model": "deepseek/deepseek-chat",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.6,
+                    "max_tokens": 100,
+                }
+                resp = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers, json=data, timeout=30
+                )
+                if resp.status_code == 200:
+                    return resp.json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                pass
+        return f"Show HN: {project_name} – {project_desc[:80]}"
+
+    def best_post_time(self) -> str:
+        """HN 最佳发帖时间 (美东早 9-11am)"""
+        # UTC 转换
+        utc_now = datetime.now(UTC)
+        # 美东 = UTC-4 (夏令时)
+        et_hour = (utc_now.hour - 4) % 24
+        if 8 <= et_hour <= 12:
+            return "optimal"
+        elif 6 <= et_hour <= 14:
+            return "good"
+        return "suboptimal"
+
+
+# ─── GitHub 生态推广器 V2 ──────────────────────────────────────────────
+class GitHubPromoterV2:
+    """V2 GitHub 推广 — 海事+投资精准生态"""
+
     def __init__(self):
         self.headers = {
             "Authorization": f"token {GITHUB_TOKEN}",
             "Accept": "application/vnd.github.v3+json",
         }
-    
-    def find_relevant_issues(self, keywords: list, limit: int = 5) -> list:
-        """搜索相关的 GitHub Issue 以便参与讨论"""
-        query = "+".join(keywords[:3])
-        url = f"https://api.github.com/search/issues?q={query}+state:open&sort=updated&per_page={limit}"
-        
-        resp = requests.get(url, headers=self.headers)
-        if resp.status_code == 200:
-            return resp.json().get("items", [])
-        return []
-    
-    def generate_helpful_reply(self, issue_body: str, issue_title: str) -> Optional[str]:
-        """生成对 Issue 有帮助的回复"""
-        prompt = f"""作为一个技术社区贡献者，请对以下 GitHub Issue 生成有帮助的回复。
 
-Issue 标题: {issue_title}
-Issue 内容: {issue_body[:1000]}
-
-要求:
-- 确实是提出建设性建议，不是灌水
-- 简洁、专业、有帮助
-- 可以提出解决方案、类似经验或资源推荐
-- 100-300 字
-- 保持真诚，不要过度推销
-    
-回复:"""
-        
-        headers = {
-            "Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY', '')}",
-            "Content-Type": "application/json",
-        }
-        data = {
-            "model": "deepseek/deepseek-chat",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.7,
-            "max_tokens": 500,
-        }
+    def find_trending_repos(self, language: str = None, topic: str = None) -> list:
+        """发现趋势仓库 — 可按语言/主题筛选"""
+        qualifiers = ["created:>2026-01-01"]
+        if language:
+            qualifiers.append(f"language:{language}")
+        if topic:
+            qualifiers.append(f"topic:{topic}")
+            
+        q = "+".join(qualifiers)
+        url = f"https://api.github.com/search/repositories?q={q}&sort=stars&order=desc&per_page=10"
         
         try:
-            resp = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                               headers=headers, json=data, timeout=30)
+            resp = requests.get(url, headers=self.headers, timeout=15)
             if resp.status_code == 200:
-                return resp.json()["choices"][0]["message"]["content"]
-        except Exception:
-            pass
-        return None
-    
-    def analyze_trending(self) -> list:
-        """分析 GitHub Trending 仓库"""
-        url = "https://api.github.com/search/repositories?q=created:>2026-01-01&sort=stars&order=desc&per_page=10"
-        resp = requests.get(url, headers=self.headers)
-        
-        if resp.status_code == 200:
-            repos = resp.json().get("items", [])
-            trending = []
-            for r in repos:
-                trending.append({
+                repos = resp.json().get("items", [])
+                return [{
                     "name": r["full_name"],
                     "stars": r["stargazers_count"],
                     "description": r["description"],
                     "language": r["language"],
                     "topics": r.get("topics", []),
-                })
-            return trending
+                    "url": r["html_url"],
+                } for r in repos]
+        except Exception:
+            pass
         return []
-    
-    def find_collaboration_opportunities(self) -> list:
-        """寻找合适的协作机会 (PR / Issue)"""
-        # 优先找自己技术栈相关的开源项目
-        keywords = ["python", "automation", "cli", "developer-tools"]
-        issues = self.find_relevant_issues(keywords, limit=10)
+
+    def find_external_mentions(self) -> list:
+        """搜索外界提到你的项目的 Issue/Discussion"""
+        query = f"\"gitmoney\" OR \"{GITHUB_USER}/gitmoney\" in:body"
+        url = f"https://api.github.com/search/issues?q={query}&sort=updated&per_page=10"
+        try:
+            resp = requests.get(url, headers=self.headers, timeout=15)
+            if resp.status_code == 200:
+                items = resp.json().get("items", [])
+                return [{
+                    "url": i["html_url"],
+                    "title": i["title"],
+                    "repo": i.get("repository_url", "").split("/")[-1],
+                    "user": i["user"]["login"],
+                } for i in items]
+        except Exception:
+            pass
+        return []
+
+    def star_relevant_repos(self, topics: list = None) -> list:
+        """发现并记录值得关注的同类仓库"""
+        if topics is None:
+            topics = ["maritime", "cruise", "stock-screener", "automation"]
+        results = []
+        for topic in topics:
+            repos = self.find_trending_repos(topic=topic)
+            results.extend(repos)
+        # 去重
+        seen = set()
+        deduped = []
+        for r in results:
+            if r["name"] not in seen:
+                seen.add(r["name"])
+                deduped.append(r)
+        return deduped[:10]
+
+    def analyze_repo_seo(self) -> dict:
+        """分析自己的仓库 SEO 表现"""
+        url = f"https://api.github.com/repos/{GITHUB_USER}/gitmoney"
+        try:
+            resp = requests.get(url, headers=self.headers, timeout=15)
+            if resp.status_code == 200:
+                repo = resp.json()
+                return {
+                    "name": repo["full_name"],
+                    "description": repo.get("description", ""),
+                    "topics": repo.get("topics", []),
+                    "has_website": bool(repo.get("homepage")),
+                    "has_wiki": repo.get("has_wiki", False),
+                    "open_issues": repo.get("open_issues_count", 0),
+                    "stars": repo.get("stargazers_count", 0),
+                    "seo_score": self._calc_seo_score(repo),
+                }
+        except Exception:
+            pass
+        return {"error": "could not fetch repo info"}
+
+    def _calc_seo_score(self, repo: dict) -> int:
+        """计算仓库 SEO 评分"""
+        score = 0
+        desc = repo.get("description", "") or ""
+        topics = repo.get("topics", []) or []
+        readme = repo.get("has_readme", False)
         
-        opportunities = []
-        for issue in issues[:3]:
-            opportunities.append({
-                "repo": issue.get("repository_url", "").split("/")[-2] + "/" + issue.get("repository_url", "").split("/")[-1],
-                "issue_number": issue["number"],
-                "title": issue["title"],
-                "url": issue["html_url"],
-                "score": random.randint(60, 95),  # 参与价值评分
-            })
+        if len(desc) > 30:
+            score += 20
+        if len(topics) >= 3:
+            score += 20
+        if readme:
+            score += 20
+        if repo.get("homepage"):
+            score += 15
+        if repo.get("stargazers_count", 0) > 10:
+            score += 15
+        if repo.get("forks_count", 0) > 3:
+            score += 10
         
-        return opportunities
+        return min(score, 100)
 
 
-# ─── Reddit/HN 推广器 ────────────────────────────────────────────────
-
-class SocialPromoter:
-    """Reddit / Hacker News 推广"""
-    
-    def post_to_reddit(self, title: str, url: str, subreddit: str = "programming") -> dict:
-        """提交到 Reddit (需要 Reddit API 凭据)"""
-        config = CONFIG.get("traffic", {}).get("platforms", {}).get("reddit", {})
-        if not config.get("enabled"):
-            return {"status": "skipped", "reason": "Reddit not configured"}
-        
-        # 保存到队列
-        queue_file = DATA_DIR / "reddit_queue.json"
-        queue = []
-        if queue_file.exists():
-            with open(queue_file) as f:
-                queue = json.load(f)
-        
-        queue.append({
-            "title": title,
-            "url": url,
-            "subreddit": subreddit,
-            "created_at": datetime.now(UTC).isoformat(),
-            "status": "pending",
-        })
-        
-        with open(queue_file, "w") as f:
-            json.dump(queue[-20:], f, indent=2)
-        
-        return {"status": "queued"}
-    
-    def find_best_subreddits(self, topic: str) -> list:
-        """根据主题推荐最佳 Subreddit"""
-        topic_map = {
-            "python": ["r/Python", "r/learnpython", "r/programming"],
-            "automation": ["r/automation", "r/devops", "r/Python"],
-            "investing": ["r/investing", "r/valueinvesting", "r/stocks"],
-            "maritime": ["r/maritime", "r/shipping", "r/Nautical"],
-            "github": ["r/github", "r/opensource", "r/programming"],
-        }
-        
-        for key, subs in topic_map.items():
-            if key in topic.lower():
-                return subs
-        
-        return ["r/programming", "r/coolgithubprojects"]
-
-
-# ─── 主控 ────────────────────────────────────────────────────────────
-
+# ─── 每日执行 ──────────────────────────────────────────────────────────
 def run_daily_traffic():
-    """每日推广引流任务"""
-    seo = SEOOptimizer()
-    twitter = TwitterPromoter()
-    github = GitHubPromoter()
-    social = SocialPromoter()
+    linkedin = LinkedInPromoter()
+    social = MaritimeSocialPromoter()
+    hn = HNPromoter()
+    github = GitHubPromoterV2()
+
+    print(f"[{datetime.now(UTC).isoformat()}] Agent 2: Traffic Driver V2 - 开始流量运营")
+
+    # 1. LinkedIn 帖子生成
+    print("  生成 LinkedIn 帖子...")
+    post = linkedin.generate_linkedin_post()
+    print(f"  LinkedIn: {post['theme'][:50]}")
+    est_reach = linkedin.estimate_reach()
+    print(f"  预估触达: ~{est_reach} 人")
+
+    # 2. GitHub 生态分析
+    print("\n  分析 GitHub 生态...")
+    seo = github.analyze_repo_seo()
+    print(f"  仓库 SEO 评分: {seo.get('seo_score', 'N/A')}/100")
     
-    print(f"[{datetime.now(UTC).isoformat()}] Agent 2: Traffic Driver - 开始运营")
+    trending = github.find_trending_repos(language="Python")
+    print(f"  趋势仓库: {len(trending)} 个")
     
-    # 1. 分析 GitHub Trending
-    print("  分析 GitHub Trending...")
-    trending = github.analyze_trending()
-    print(f"  发现 {len(trending)} 个热门仓库")
-    
-    # 2. 寻找协作机会
-    print("  寻找协作机会...")
-    opps = github.find_collaboration_opportunities()
-    print(f"  找到 {len(opps)} 个协作机会")
-    
-    # 3. 生成推文线程
-    print("  准备社交媒体内容...")
-    tweet = twitter.generate_tweet_thread(trending[0]["description"] if trending else "Git automation tools")
-    print(f"  生成了 {len(tweet)} 条推文")
-    
+    mentions = github.find_external_mentions()
+    if mentions:
+        print(f"  外部提及: {len(mentions)} 条")
+    else:
+        print(f"  外部提及: 0 条 (新项目正常)")
+
+    # 3. 推广策略推荐
+    print("\n  推广策略:")
+    channels_to_push = ["cruise_consulting", "maritime_auditor", "us_stocks", "cruise_content"]
+    for ch in channels_to_push:
+        subs = social.find_best_subreddits(ch)
+        print(f"    {ch}: 推荐发帖 → {', '.join(subs[:2])}")
+
+    hn_time = hn.best_post_time()
+    print(f"    HN: {'当前是黄金时间 ✅' if hn_time == 'optimal' else f'最佳时机: {hn_time}'}")
+
     # 4. 保存报告
     report = {
         "timestamp": datetime.now(UTC).isoformat(),
-        "trending_count": len(trending),
-        "opportunities_found": len(opps),
-        "tweets_generated": len(tweet),
-        "seo_optimized": False,
+        "linkedin_post_theme": post["theme"],
+        "linkedin_estimated_reach": est_reach,
+        "github_seo_score": seo.get("seo_score", 0),
+        "trending_repos_found": len(trending),
+        "external_mentions": len(mentions),
+        "recommended_subreddits": {ch: social.find_best_subreddits(ch) for ch in channels_to_push},
+        "hn_post_time_optimal": hn_time == "optimal",
     }
-    
+
     report_path = DATA_DIR / f"traffic_report_{datetime.now(UTC).strftime('%Y%m%d')}.json"
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
-    
-    print(f"[{datetime.now(UTC).isoformat()}] Agent 2: Traffic Driver - 完成\n")
+
+    print(f"\n  报告已保存: {report_path}")
+    print(f"[{datetime.now(UTC).isoformat()}] Agent 2: Traffic Driver V2 - 完成\n")
     return report
 
 
