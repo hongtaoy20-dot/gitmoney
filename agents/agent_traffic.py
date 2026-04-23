@@ -20,7 +20,7 @@ import time
 import random
 import re
 import requests
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -34,7 +34,14 @@ LEADS_DIR.mkdir(parents=True, exist_ok=True)
 with open(CONFIG_PATH) as f:
     CONFIG = yaml.safe_load(f)
 
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or CONFIG.get("github", {}).get("token", "")
+# 支持 ${ENV_VAR} 模板语法和直接值
+_raw_token = CONFIG.get("github", {}).get("token", "")
+if _raw_token.startswith("${") and _raw_token.endswith("}"):
+    _env_var = _raw_token[2:-1]
+    GITHUB_TOKEN = os.environ.get(_env_var, "")
+else:
+    GITHUB_TOKEN = _raw_token
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "") or GITHUB_TOKEN
 GITHUB_USER = CONFIG.get("github", {}).get("username", "")
 
 
@@ -184,7 +191,7 @@ class TwitterPromoter:
         
         queue.append({
             "text": tweet_text,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "status": "pending",
         })
         
@@ -349,7 +356,7 @@ class SocialPromoter:
             "title": title,
             "url": url,
             "subreddit": subreddit,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "status": "pending",
         })
         
@@ -384,7 +391,7 @@ def run_daily_traffic():
     github = GitHubPromoter()
     social = SocialPromoter()
     
-    print(f"[{datetime.utcnow().isoformat()}] Agent 2: Traffic Driver - 开始运营")
+    print(f"[{datetime.now(UTC).isoformat()}] Agent 2: Traffic Driver - 开始运营")
     
     # 1. 分析 GitHub Trending
     print("  分析 GitHub Trending...")
@@ -403,18 +410,18 @@ def run_daily_traffic():
     
     # 4. 保存报告
     report = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "trending_count": len(trending),
         "opportunities_found": len(opps),
         "tweets_generated": len(tweet),
         "seo_optimized": False,
     }
     
-    report_path = DATA_DIR / f"traffic_report_{datetime.utcnow().strftime('%Y%m%d')}.json"
+    report_path = DATA_DIR / f"traffic_report_{datetime.now(UTC).strftime('%Y%m%d')}.json"
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
     
-    print(f"[{datetime.utcnow().isoformat()}] Agent 2: Traffic Driver - 完成\n")
+    print(f"[{datetime.now(UTC).isoformat()}] Agent 2: Traffic Driver - 完成\n")
     return report
 
 

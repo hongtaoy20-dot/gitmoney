@@ -23,7 +23,7 @@ import yaml
 import time
 import argparse
 import subprocess
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 # ─── 配置 ─────────────────────────────────────────────────────────────────
@@ -140,12 +140,12 @@ class ReportGenerator:
     
     def generate_markdown_report(self, results: dict) -> str:
         """生成 Markdown 格式的执行总结"""
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         
         lines = [
             f"# GitMoney Daily Report",
             f"",
-            f"**Date:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+            f"**Date:** {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}",
             f"**Mode:** Full Pipeline",
             f"",
             f"## Execution Summary",
@@ -196,7 +196,7 @@ class ReportGenerator:
         report_dir = DATA_DIR / "analytics"
         report_dir.mkdir(parents=True, exist_ok=True)
         
-        filename = f"daily_report_{datetime.utcnow().strftime('%Y%m%d')}.md"
+        filename = f"daily_report_{datetime.now(UTC).strftime('%Y%m%d')}.md"
         filepath = report_dir / filename
         
         with open(filepath, "w") as f:
@@ -219,7 +219,7 @@ class Orchestrator:
         """完整流程: 创作 → 推广 → 变现分析"""
         print(f"\n{'='*60}")
         print(f"  GitMoney Pipeline - Full Mode")
-        print(f"  {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
+        print(f"  {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}")
         print(f"{'='*60}\n")
         
         results = {}
@@ -244,14 +244,14 @@ class Orchestrator:
         
         # 汇总结果
         summary = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "mode": "full",
             "agents": results,
             "report_path": str(report_path),
         }
         
         # 保存 JSON 日志
-        log_path = DATA_DIR / "analytics" / f"pipeline_log_{datetime.utcnow().strftime('%Y%m%d')}.json"
+        log_path = DATA_DIR / "analytics" / f"pipeline_log_{datetime.now(UTC).strftime('%Y%m%d')}.json"
         with open(log_path, "w") as f:
             json.dump(summary, f, indent=2)
         
@@ -277,7 +277,7 @@ class Orchestrator:
         report_path = self.reporter.save_report(report)
         
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "mode": "daily",
             "agents": results,
             "report_path": str(report_path),

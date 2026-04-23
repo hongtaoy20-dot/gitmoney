@@ -18,8 +18,9 @@ import sys
 import json
 import yaml
 import time
+import random
 import requests
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # ─── 配置 ─────────────────────────────────────────────────────────────────
@@ -32,7 +33,14 @@ LEADS_DIR.mkdir(parents=True, exist_ok=True)
 with open(CONFIG_PATH) as f:
     CONFIG = yaml.safe_load(f)
 
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or CONFIG.get("github", {}).get("token", "")
+# 支持 ${ENV_VAR} 模板语法和直接值
+_raw_token = CONFIG.get("github", {}).get("token", "")
+if _raw_token.startswith("${") and _raw_token.endswith("}"):
+    _env_var = _raw_token[2:-1]
+    GITHUB_TOKEN = os.environ.get(_env_var, "")
+else:
+    GITHUB_TOKEN = _raw_token
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "") or GITHUB_TOKEN
 GITHUB_USER = CONFIG.get("github", {}).get("username", "")
 PRIMARY_REPO = CONFIG.get("github", {}).get("primary_repo", "gitmoney")
 MON_CONFIG = CONFIG.get("monetizer", {})
@@ -90,7 +98,7 @@ class TrafficAnalyzer:
             "open_issues": repo.get("open_issues_count", 0),
             "watchers": repo.get("subscribers_count", 0),
             "traffic": traffic,
-            "collected_at": datetime.utcnow().isoformat(),
+            "collected_at": datetime.now(UTC).isoformat(),
         }
     
     def compute_trend(self) -> dict:
@@ -269,13 +277,13 @@ Your sponsorship directly supports:
                         "repo": issue.get("repository_url", "").split("/")[-1],
                         "potential_value": random.randint(50, 500),
                         "status": "new",
-                        "discovered_at": datetime.utcnow().isoformat(),
+                        "discovered_at": datetime.now(UTC).isoformat(),
                     }
                     leads.append(lead)
         
         # 保存线索
         if leads:
-            leads_file = LEADS_DIR / f"leads_{datetime.utcnow().strftime('%Y%m%d')}.json"
+            leads_file = LEADS_DIR / f"leads_{datetime.now(UTC).strftime('%Y%m%d')}.json"
             with open(leads_file, "w") as f:
                 json.dump(leads, f, indent=2)
         
@@ -325,7 +333,7 @@ def run_daily_monetization():
     traffic = TrafficAnalyzer()
     monetizer = MonetizationAnalyzer()
     
-    print(f"[{datetime.utcnow().isoformat()}] Agent 3: Monetizer - 开始分析")
+    print(f"[{datetime.now(UTC).isoformat()}] Agent 3: Monetizer - 开始分析")
     
     # 1. 流量分析
     print("  采集仓库统计数据...")
@@ -350,17 +358,17 @@ def run_daily_monetization():
     
     # 5. 生成每日报告
     report = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "stats": stats,
         "revenue_potential": potential,
         "leads_found": len(leads),
     }
     
-    report_path = DATA_DIR / f"monetization_report_{datetime.utcnow().strftime('%Y%m%d')}.json"
+    report_path = DATA_DIR / f"monetization_report_{datetime.now(UTC).strftime('%Y%m%d')}.json"
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
     
-    print(f"[{datetime.utcnow().isoformat()}] Agent 3: Monetizer - 完成\n")
+    print(f"[{datetime.now(UTC).isoformat()}] Agent 3: Monetizer - 完成\n")
     return report
 
 

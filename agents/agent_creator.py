@@ -19,7 +19,7 @@ import yaml
 import time
 import random
 import requests
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # ─── 配置 ─────────────────────────────────────────────────────────────────
@@ -30,7 +30,14 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 with open(CONFIG_PATH) as f:
     CONFIG = yaml.safe_load(f)
 
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or CONFIG.get("github", {}).get("token", "")
+# 支持 ${ENV_VAR} 模板语法和直接值
+_raw_token = CONFIG.get("github", {}).get("token", "")
+if _raw_token.startswith("${") and _raw_token.endswith("}"):
+    _env_var = _raw_token[2:-1]
+    GITHUB_TOKEN = os.environ.get(_env_var, "")
+else:
+    GITHUB_TOKEN = _raw_token
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "") or GITHUB_TOKEN
 GITHUB_USER = CONFIG.get("github", {}).get("username", "")
 CREATE_CONFIG = CONFIG.get("creator", {})
 
@@ -198,7 +205,7 @@ This guide provides a starting point for your exploration.
             "tags": template["tags"],
             "keywords": template["keywords"],
             "read_time": template["estimated_read_time"],
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "source": "llm" if self.api_key else "template",
         }
         
@@ -255,7 +262,7 @@ README 需要包含:
             "description": tpl["description"],
             "language": tpl["language"],
             "readme": readme,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         }
         
         return result
@@ -311,7 +318,7 @@ def run_daily_creation():
     """每日自动创作任务"""
     gen = ContentGenerator()
     
-    print(f"[{datetime.utcnow().isoformat()}] Agent 1: Content Creator - 开始每日创作")
+    print(f"[{datetime.now(UTC).isoformat()}] Agent 1: Content Creator - 开始每日创作")
     
     # 1. 选题
     topic = gen.select_best_topic()
@@ -341,7 +348,7 @@ def run_daily_creation():
     else:
         print(f"  发布状态: {result.get('message', 'unknown')}")
     
-    print(f"[{datetime.utcnow().isoformat()}] Agent 1: Content Creator - 完成\n")
+    print(f"[{datetime.now(UTC).isoformat()}] Agent 1: Content Creator - 完成\n")
     return {"article": article, "issue": result}
 
 
