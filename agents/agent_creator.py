@@ -179,9 +179,27 @@ class ContentGeneratorV2:
     """V2 内容生成器 — 变现驱动选题 + 专业化 CTA"""
 
     def __init__(self):
-        self.api_base = "https://openrouter.ai/api/v1/chat/completions"
-        self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
-        self.model = "deepseek/deepseek-chat"
+        # Try OpenRouter first, then DeepSeek, then SiliconFlow as fallbacks
+        configs = [
+            ("openrouter", "https://openrouter.ai/api/v1/chat/completions",
+             os.environ.get("OPENROUTER_API_KEY", ""), "deepseek/deepseek-chat"),
+            ("deepseek", "https://api.deepseek.com/v1/chat/completions",
+             os.environ.get("DEEPSEEK_API_KEY", ""), "deepseek-chat"),
+            ("siliconflow", "https://api.siliconflow.cn/v1/chat/completions",
+             os.environ.get("SILICONFLOW_API_KEY", ""), "Qwen/Qwen2.5-32B-Instruct"),
+        ]
+        self.api_base = ""
+        self.api_key = ""
+        self.model = ""
+        for name, base, key, model in configs:
+            if key:
+                self.api_base = base
+                self.api_key = key
+                self.model = model
+                self._provider_name = name
+                break
+        if not self.api_key:
+            self._provider_name = "fallback"
 
     def _call_llm(self, prompt: str, system: str = "") -> str:
         if not self.api_key:
@@ -194,7 +212,7 @@ class ContentGeneratorV2:
             data = {
                 "model": self.model,
                 "messages": [
-                    {"role": "system", "content": system or "你是 GitMoney 内容创作 Agent，专精海事和投资领域。"},
+                    {"role": "system", "content": system or "你是 GitMoney 内容创作 Agent，专精海事和投资领域。请用中文输出专业、高质量的内容。"},
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0.7,

@@ -1,0 +1,13 @@
+open: true
+enable: true
+invite: true
+payroll:
+  - tier_name: "🐬 Dolphin"
+    amount: 5
+    description: "每周海事运营/合规深度文章 + 社区访问"
+  - tier_name: "⚓ Captain"
+    amount: 20
+    description: "每周美股 Watchlist + 海事合规模板 + 每月15min咨询"
+  - tier_name: "🚢 Admiral"
+    amount: 50
+    description: "每月1h一对一咨询 + 定制方案 + 优先使用新工具"
