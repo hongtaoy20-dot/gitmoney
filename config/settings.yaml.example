@@ -1,0 +1,108 @@
+# GitMoney 配置
+# 请复制此文件为 settings.yaml 后填写
+# ⚠️ 注意：Token 不要提交到 GitHub！
+
+# === GitHub ===
+github:
+  token: "${GITHUB_TOKEN}"          # 通过环境变量设置
+  username: "hongtaoy20-dot"
+  primary_repo: "gitmoney"
+  sponsor_repo: ""
+
+# === Agent 1: Content Creator ===
+creator:
+  content_types:
+    - article
+    - code_template
+    - gist
+    - issue_response
+    - pr
+    - readme
+  
+  topics:
+    - "AI agents"
+    - "automation"
+    - "productivity"
+    - "Python"
+    - "GitHub tools"
+    - "open source"
+  
+  output_frequency:
+    articles_per_week: 3
+    code_templates_per_week: 2
+    responses_per_day: 2
+  
+  quality_settings:
+    min_word_count: 800
+    seo_score_threshold: 70
+    ai_detection_max: 30
+
+# === Agent 2: Traffic Driver ===
+traffic:
+  platforms:
+    twitter: 
+      enabled: false
+      api_key: ""
+      api_secret: ""
+    linkedin:
+      enabled: false
+      api_key: ""
+    reddit:
+      enabled: false
+      client_id: ""
+      client_secret: ""
+    hackernews:
+      enabled: true
+  
+  seo:
+    keyword_research: true
+    backlink_strategy: true
+    meta_optimization: true
+  
+  github_marketing:
+    issue_participation: true
+    pr_collaboration: true
+    star_for_star: false
+    trending_analysis: true
+
+# === Agent 3: Monetizer ===
+monetizer:
+  channels:
+    github_sponsors:
+      enabled: true
+      target_tier_monthly: 50
+    
+    paid_content:
+      enabled: true
+      platforms:
+        - "gumroad"
+        - "leanpub"
+      pricing:
+        template: 5
+        ebook: 15
+        course: 49
+    
+    consulting:
+      enabled: true
+      rate_per_hour: 100
+      niche: "AI automation"
+    
+    affiliate:
+      enabled: false
+      networks:
+        - "amazon"
+        - "digitalocean"
+  
+  analytics:
+    track_conversion: true
+    track_views: true
+    a_b_test_enabled: true
+
+# === Orchestrator ===
+orchestrator:
+  schedule:
+    daily_time: "08:00"
+    weekly_review: "Sunday 20:00"
+  mode: "manual"
+  alert_level: "info"
+  log_dir: "data/analytics/"
